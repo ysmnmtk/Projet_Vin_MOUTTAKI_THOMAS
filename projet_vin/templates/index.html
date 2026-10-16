@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qualité du vin</title>
+<style>
+  * { font-family: 'Dubai', sans-serif; box-sizing: border-box; }
+  body { margin: 0; background: #f4f4f4; color: #222; font-size: 16px; }
+  main { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 26px; margin: 0 0 8px; }
+  p { margin: 0 0 14px; }
+  form, .result, .error { background: #fff; border: 1px solid #ccc; padding: 16px; margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  label { display: flex; flex-direction: column; gap: 3px; }
+  input { padding: 6px; border: 1px solid #999; font-size: 16px; width: 100%; }
+  .actions { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+  button { padding: 7px 14px; font-size: 16px; border: 1px solid #666; background: #eee; cursor: pointer; }
+  button.primary { background: #333; color: #fff; border-color: #333; }
+  .result h2 { margin: 0 0 8px; font-size: 22px; }
+  .result.good { border-color: #2e7d32; }
+  .result.bad { border-color: #b26a00; }
+  .error { border-color: #b00020; color: #b00020; }
+  ul { margin: 8px 0 0; padding-left: 20px; }
+  .small { font-size: 14px; color: #555; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ce vin est-il bon ?</h1>
+  <p>Entrer les 11 mesures du vin (rouge ou blanc). Le modèle indique si la note de qualité est d'au moins 7.</p>
+
+  <form method="post" action="/" id="form">
+    <div class="grid">
+      {% for c in champs %}
+      <label>
+        {{ c.label }}
+        <input type="number" step="any" min="0" required
+               name="{{ c.slug }}" data-nom="{{ c.nom }}" value="{{ valeurs.get(c.nom, '') }}">
+      </label>
+      {% endfor %}
+    </div>
+
+    <div class="actions">
+      <button class="primary" type="submit">Prédire</button>
+      <button type="button" data-exemple="bon">Exemple : bon vin</button>
+      <button type="button" data-exemple="ordinaire">Exemple : vin ordinaire</button>
+      <button type="button" id="effacer">Effacer</button>
+    </div>
+  </form>
+
+  {% if erreur %}
+  <div class="error" role="alert">Saisie incorrecte. {{ erreur }}</div>
+  {% endif %}
+
+  {% if resultat %}
+  {% set bon = resultat.label == 'bon' %}
+  <section class="result {{ 'good' if bon else 'bad' }}">
+    <h2>{{ 'Bon vin' if bon else 'Pas un bon vin' }}</h2>
+    <p>Score du modèle : {{ '%.2f'|format(resultat.score) }} (seuil à 0,50). Le score est la part des arbres de la forêt qui votent « bon vin ».</p>
+    {% if resultat.avertissements %}
+    <ul>{% for a in resultat.avertissements %}<li>{{ a }}</li>{% endfor %}</ul>
+    {% endif %}
+    <p class="small">Résultats du modèle sur {{ resultat.metriques.n_test }} vins de test : rappel {{ '%.2f'|format(resultat.metriques.recall) }}, précision {{ '%.2f'|format(resultat.metriques.precision) }}, AUC {{ '%.2f'|format(resultat.metriques.auc) }}.</p>
+  </section>
+  {% endif %}
+</main>
+
+<script>
+  const exemples = {{ exemples|tojson }};
+  const plages = {{ plages|tojson }};
+  const form = document.getElementById('form');
+
+  form.querySelectorAll('input[type=number]').forEach(input => {
+    const p = plages[input.dataset.nom];
+    if (p) input.placeholder = p[0] + ' à ' + p[1];
+  });
+
+  document.querySelectorAll('[data-exemple]').forEach(btn => btn.addEventListener('click', () => {
+    const valeurs = exemples[btn.dataset.exemple];
+    Object.entries(valeurs).forEach(([nom, v]) => { form.elements[nom.replaceAll(' ', '_')].value = v; });
+  }));
+
+  document.getElementById('effacer').addEventListener('click', () => {
+    form.querySelectorAll('input[type=number]').forEach(i => { i.value = ''; });
+    document.querySelectorAll('.result, .error').forEach(el => el.remove());
+  });
+</script>
+</body>
+</html>
